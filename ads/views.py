@@ -4,10 +4,13 @@ from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import DetailView, ListView, CreateView, UpdateView, DeleteView
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.viewsets import ModelViewSet
 
-from ads.models import Category, Ad
-from ads.serializers import AdSerializer, AdListSerializer, AdDetailSerializer
+from ads.models import Category, Ad, Selection
+from ads.permissions import IsOwner, IsStaff
+from ads.serializers import AdSerializer, AdListSerializer, AdDetailSerializer, SelectionSerializer, \
+    SelectionListSerializer, SelectionDetailSerializer, SelectionCreateSerializer
 
 
 def root(request):
@@ -71,6 +74,17 @@ class AdViewSet(ModelViewSet):
         "retrieve": AdDetailSerializer
     }
 
+    permissions = {
+        "retrieve": [IsAuthenticated],
+        "update": [IsAuthenticated, IsOwner | IsStaff],
+        "partial_update": [IsAuthenticated, IsOwner | IsStaff],
+        "destroy": [IsAuthenticated, IsOwner | IsStaff],
+    }
+    default_permission = [AllowAny]
+
+    def get_permissions(self):
+        return [permission() for permission in self.permissions.get(self.action, self.default_permission)]
+
     def get_serializer_class(self):
         return self.serializers.get(self.action, self.default_serializer)
 
@@ -116,3 +130,27 @@ class AdUploadImageView(UpdateView):
                              "is_published": self.object.is_published,
                              "image": self.object.image.url
                              })
+
+
+class SelectionViewSet(ModelViewSet):
+    queryset = Selection.objects.all()
+    default_serializer = SelectionSerializer
+    serializers = {
+        "list": SelectionListSerializer,
+        "retrieve": SelectionDetailSerializer,
+        "create": SelectionCreateSerializer,
+    }
+
+    permissions = {
+        "create": [IsAuthenticated],
+        "update": [IsAuthenticated, IsOwner],
+        "partial_update": [IsAuthenticated, IsOwner],
+        "destroy": [IsAuthenticated, IsOwner],
+    }
+    default_permission = [AllowAny]
+
+    def get_permissions(self):
+        return [permission() for permission in self.permissions.get(self.action, self.default_permission)]
+
+    def get_serializer_class(self):
+        return self.serializers.get(self.action, self.default_serializer)
